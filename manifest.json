@@ -1,0 +1,32 @@
+{
+  "manifest_version": 2,
+  "name": "Polination AI Chat for Firefox",
+  "version": "1.1",
+  "description": "AI chat with Polination API for Firefox",
+  "author": "Processor",
+  "icons": {
+    "32": "icon-32.png",
+    "128": "icon.png"
+  },
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "storage",
+    "tabs",
+    "<all_urls>"
+  ],
+  "browser_action": {
+    "default_icon": "icon.png",
+    "default_title": "Open Polination AI Chat"
+  },
+  "sidebar_action": {
+    "default_icon": "icon.png",
+    "default_title": "Polination AI Chat",
+    "default_panel": "popup.html",
+    "open_at_install": true
+  },
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  }
+}
