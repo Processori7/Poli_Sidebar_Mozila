@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Polination AI Chat for Firefox",
-  "version": "1.3",
+  "version": "1.4",
   "description": "AI chat with Polination API for Firefox",
   "author": "Processor",
   "icons": {

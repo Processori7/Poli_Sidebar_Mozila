@@ -15,6 +15,7 @@ const elements = {
     temperatureValue: null,
     privateCheckbox: null,
     noHistoryCheckbox: null,
+    apiKeyInput: null,
     modelSelect: null,
     modelInfo: null,
     chatContainer: null,
@@ -63,6 +64,7 @@ function initializeElements() {
     elements.temperatureValue = document.getElementById('temperature-value');
     elements.privateCheckbox = document.getElementById('private-checkbox');
     elements.noHistoryCheckbox = document.getElementById('no-history-checkbox');
+    elements.apiKeyInput = document.getElementById('api-key-input');
     elements.modelSelect = document.getElementById('model-select');
     elements.modelInfo = document.getElementById('model-info');
     elements.chatContainer = document.getElementById('chat-container');
@@ -111,6 +113,10 @@ async function initializeSettings() {
         // Apply no history mode (default false)
         const noHistory = stored.noHistory !== undefined ? stored.noHistory : false;
         elements.noHistoryCheckbox.checked = noHistory;
+        
+        // Apply API key
+        const apiKey = stored.apiKey || '';
+        elements.apiKeyInput.value = apiKey;
         
         // Store selected model for later
         window.selectedModel = stored.selectedModel;
@@ -193,7 +199,15 @@ async function loadModels() {
             }, 20000); // 20 seconds
         });
         
-        const fetchPromise = fetch('https://text.pollinations.ai/models').then(async response => {
+        const apiKey = elements.apiKeyInput.value.trim();
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKey) {
+            headers['Authorization'] = `Bearer ${apiKey}`;
+        }
+        
+        const fetchPromise = fetch('https://gen.pollinations.ai/v1/models', {
+            headers: headers
+        }).then(async response => {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -326,6 +340,22 @@ function updateModelInfo() {
     }
 }
 
+// Save settings to storage
+async function saveSettings() {
+    try {
+        const settings = {
+            theme: elements.themeSelect.value,
+            temperature: parseFloat(elements.temperatureSlider.value),
+            private: elements.privateCheckbox.checked,
+            noHistory: elements.noHistoryCheckbox.checked,
+            apiKey: elements.apiKeyInput.value.trim()
+        };
+        await browser.storage.local.set(settings);
+    } catch (error) {
+        console.error('Error saving settings:', error);
+    }
+}
+
 // Setup event listeners
 function setupEventListeners() {
     // Language selection
@@ -340,7 +370,7 @@ function setupEventListeners() {
     elements.themeSelect.addEventListener('change', function() {
         const theme = this.value;
         document.body.setAttribute('data-theme', theme);
-        browser.storage.local.set({ theme });
+        saveSettings();
     });
     
     // Settings panel
@@ -356,23 +386,17 @@ function setupEventListeners() {
     // Temperature slider
     elements.temperatureSlider.addEventListener('input', function() {
         elements.temperatureValue.textContent = this.value;
-        browser.storage.local.set({ temperature: parseFloat(this.value) });
-        // Update temperature label with new value
-        const tempLabel = document.querySelector('[data-translate="temperature"]');
-        if (tempLabel) {
-            tempLabel.textContent = `${t('temperature')}: ${this.value}`;
-        }
+        saveSettings();
     });
     
-    // Private mode checkbox
-    elements.privateCheckbox.addEventListener('change', function() {
-        browser.storage.local.set({ private: this.checked });
-    });
+    // Private checkbox
+    elements.privateCheckbox.addEventListener('change', saveSettings);
     
-    // No history mode checkbox
-    elements.noHistoryCheckbox.addEventListener('change', function() {
-        browser.storage.local.set({ noHistory: this.checked });
-    });
+    // No history checkbox
+    elements.noHistoryCheckbox.addEventListener('change', saveSettings);
+    
+    // API key input
+    elements.apiKeyInput.addEventListener('input', saveSettings);
     
     // Model selection
     elements.modelSelect.addEventListener('change', function() {
@@ -507,6 +531,21 @@ async function sendMessage() {
         return;
     }
     
+    // Check for generation commands
+    if (message.startsWith('/image ')) {
+        await generateImage(message.slice(7));
+        elements.messageInput.value = '';
+        return;
+    } else if (message.startsWith('/audio ')) {
+        await generateAudio(message.slice(7));
+        elements.messageInput.value = '';
+        return;
+    } else if (message.startsWith('/video ')) {
+        await generateVideo(message.slice(8));
+        elements.messageInput.value = '';
+        return;
+    }
+    
     // Disable send button
     elements.sendButton.disabled = true;
     elements.messageInput.disabled = true;
@@ -576,6 +615,11 @@ async function prepareMessages(userMessage) {
 async function sendToPolination(messages, model) {
     const temperature = parseFloat(elements.temperatureSlider.value);
     const isPrivate = elements.privateCheckbox.checked;
+    const apiKey = elements.apiKeyInput.value.trim();
+    
+    if (!apiKey) {
+        throw new Error('API key is required. Please enter your Pollinations API key in settings.');
+    }
     
     const requestBody = {
         model: model,
@@ -585,11 +629,14 @@ async function sendToPolination(messages, model) {
         private: isPrivate
     };
     
-    const response = await fetch('https://text.pollinations.ai/openai', {
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+    };
+    
+    const response = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: headers,
         body: JSON.stringify(requestBody)
     });
     
@@ -662,6 +709,148 @@ async function sendToPolination(messages, model) {
     await saveChatHistory();
     
     showStatus(t('responseReceived'));
+}
+
+// Generate image
+async function generateImage(prompt) {
+    const apiKey = elements.apiKeyInput.value.trim();
+    if (!apiKey) {
+        addMessage('Error: API key is required.', 'error');
+        return;
+    }
+    
+    addMessage(`Generating image: ${prompt}`, 'user');
+    showStatus(t('generatingImage'));
+    
+    try {
+        const url = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?model=flux&private=true`;
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        const imageUrl = URL.createObjectURL(blob);
+        
+        const messageElement = addMessage('', 'bot');
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.style.maxWidth = '100%';
+        img.style.height = 'auto';
+        messageElement.appendChild(img);
+        
+        await saveChatHistory();
+        showStatus(t('imageGenerated'));
+    } catch (error) {
+        console.error('Error generating image:', error);
+        addMessage('Error generating image: ' + error.message, 'error');
+        showStatus(t('generationFailed'), true);
+    }
+}
+
+// Generate audio
+async function generateAudio(prompt) {
+    const apiKey = elements.apiKeyInput.value.trim();
+    if (!apiKey) {
+        addMessage('Error: API key is required.', 'error');
+        return;
+    }
+    
+    addMessage(`Generating audio: ${prompt}`, 'user');
+    showStatus(t('generatingAudio'));
+    
+    try {
+        const messages = [{ role: 'user', content: prompt }];
+        const requestBody = {
+            model: 'openai',
+            messages: messages,
+            modalities: ['audio'],
+            audio: { voice: 'alloy', format: 'wav' },
+            private: true
+        };
+        
+        const response = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.audio) {
+            const audioData = data.choices[0].message.audio.data;
+            const audioBlob = new Blob([Uint8Array.from(atob(audioData), c => c.charCodeAt(0))], { type: 'audio/wav' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            
+            const messageElement = addMessage('', 'bot');
+            const audio = document.createElement('audio');
+            audio.src = audioUrl;
+            audio.controls = true;
+            messageElement.appendChild(audio);
+        } else {
+            throw new Error('No audio in response');
+        }
+        
+        await saveChatHistory();
+        showStatus(t('audioGenerated'));
+    } catch (error) {
+        console.error('Error generating audio:', error);
+        addMessage('Error generating audio: ' + error.message, 'error');
+        showStatus(t('generationFailed'), true);
+    }
+}
+
+// Generate video
+async function generateVideo(prompt) {
+    const apiKey = elements.apiKeyInput.value.trim();
+    if (!apiKey) {
+        addMessage('Error: API key is required.', 'error');
+        return;
+    }
+    
+    addMessage(`Generating video: ${prompt}`, 'user');
+    showStatus(t('generatingVideo'));
+    
+    try {
+        const url = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?model=veo&duration=4&private=true`;
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        const videoUrl = URL.createObjectURL(blob);
+        
+        const messageElement = addMessage('', 'bot');
+        const video = document.createElement('video');
+        video.src = videoUrl;
+        video.controls = true;
+        video.style.maxWidth = '100%';
+        messageElement.appendChild(video);
+        
+        await saveChatHistory();
+        showStatus(t('videoGenerated'));
+    } catch (error) {
+        console.error('Error generating video:', error);
+        addMessage('Error generating video: ' + error.message, 'error');
+        showStatus(t('generationFailed'), true);
+    }
 }
 
 // Add message to chat

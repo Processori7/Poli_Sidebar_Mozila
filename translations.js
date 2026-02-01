@@ -16,6 +16,7 @@ const translations = {
         privateMode: "Private mode (don't show in public feed)",
         noHistoryMode: "Don't save history",
         closeSettings: "Close",
+        apiKey: "API Key",
         language: "Language",
         
         // Model section
@@ -50,6 +51,13 @@ const translations = {
         sendingRequest: "Sending request...",
         receivingResponse: "Receiving response...",
         responseReceived: "Response received",
+        generatingImage: "Generating image...",
+        imageGenerated: "Image generated",
+        generatingAudio: "Generating audio...",
+        audioGenerated: "Audio generated",
+        generatingVideo: "Generating video...",
+        videoGenerated: "Video generated",
+        generationFailed: "Generation failed",
         chatCleared: "Chat cleared",
         chatSaved: "Chat saved",
         responseCopied: "Response copied to clipboard",
@@ -95,6 +103,7 @@ const translations = {
         privateMode: "Приватный режим (не показывать в публичной ленте)",
         noHistoryMode: "Не сохранять историю",
         closeSettings: "Закрыть",
+        apiKey: "API Ключ",
         language: "Язык",
         
         // Model section
@@ -129,6 +138,13 @@ const translations = {
         sendingRequest: "Отправка запроса...",
         receivingResponse: "Получение ответа...",
         responseReceived: "Ответ получен",
+        generatingImage: "Генерация изображения...",
+        imageGenerated: "Изображение сгенерировано",
+        generatingAudio: "Генерация аудио...",
+        audioGenerated: "Аудио сгенерировано",
+        generatingVideo: "Генерация видео...",
+        videoGenerated: "Видео сгенерировано",
+        generationFailed: "Генерация не удалась",
         chatCleared: "Чат очищен",
         chatSaved: "Чат сохранен",
         responseCopied: "Ответ скопирован в буфер обмена",
