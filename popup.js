@@ -37,6 +37,9 @@ const elements = {
 };
 
 // Initialize extension when DOM is loaded
+// Кроссбраузерный доступ к хранилищу (Chrome: chrome.storage, Firefox: browser.storage)
+const storageAPI = (typeof browser !== 'undefined' && browser.storage) ? browser.storage : chrome.storage;
+
 document.addEventListener('DOMContentLoaded', async function() {
     initializeLanguage();
     initializeElements();
@@ -189,6 +192,23 @@ async function clearChatHistory() {
 
 // Load available models from Polination API with 20-second timeout
 async function loadModels() {
+    // Список моделей кэшируется: без этого панель на каждом открытии ждала
+    // ответа сети, прежде чем показать список моделей и дать работать с чатом.
+    const MODELS_CACHE_KEY = 'modelsCacheV1';
+    const MODELS_CACHE_TTL = 6 * 60 * 60 * 1000;
+    try {
+        const cachedStore = await storageAPI.local.get(MODELS_CACHE_KEY);
+        const cached = cachedStore && cachedStore[MODELS_CACHE_KEY];
+        if (cached && cached.models && cached.models.length && (Date.now() - cached.ts) < MODELS_CACHE_TTL) {
+            availableModels = cached.models;
+            if (typeof textModels !== 'undefined' && cached.text) textModels = cached.text;
+            if (typeof imageModels !== 'undefined' && cached.image) imageModels = cached.image;
+            populateModelSelect();
+            showStatus(t('modelsLoaded'));
+            return;
+        }
+    } catch (e) {}
+
     try {
         showStatus(t('loadingModelsStatus'));
         
@@ -225,6 +245,14 @@ async function loadModels() {
         
         populateModelSelect();
         showStatus(t('modelsLoaded'));
+        try {
+            storageAPI.local.set({ modelsCacheV1: {
+                ts: Date.now(),
+                models: availableModels,
+                text: (typeof textModels !== 'undefined' ? textModels : null),
+                image: (typeof imageModels !== 'undefined' ? imageModels : null)
+            } });
+        } catch (e) {}
         
     } catch (error) {
         console.error('Error loading models:', error);
